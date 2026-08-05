@@ -9,6 +9,7 @@ import NeedsAdjustmentModal from '../components/NeedsAdjustmentModal'
 import OpenEntryBanner from '../components/OpenEntryBanner'
 import RecentEntries from '../components/RecentEntries'
 import AdminPanel from '../components/admin/AdminPanel'
+import Reports from '../components/admin/Reports'
 import { useAuth } from '../hooks/useAuth'
 import { useSunsetGradient } from '../hooks/useSunsetGradient'
 import {
@@ -23,10 +24,11 @@ import type { TimeEntryWithRelations } from '../types'
 import { toIsoDate } from '../lib/utils'
 
 export default function Dashboard() {
-  const { user, isAdmin } = useAuth()
+  const { user, profile, isAdmin } = useAuth()
   const background = useSunsetGradient()
+  const isInspector = !isAdmin && profile?.role === 'inspector'
 
-  const [tab, setTab] = useState<'dashboard' | 'admin'>('dashboard')
+  const [tab, setTab] = useState<'dashboard' | 'admin' | 'reports'>('dashboard')
   const [month, setMonth] = useState(new Date())
   const [companies, setCompanies] = useState<CompanyRow[]>([])
   const [inspectors, setInspectors] = useState<ProfileRow[]>([])
@@ -82,6 +84,8 @@ export default function Dashboard() {
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {tab === 'admin' && isAdmin ? (
           <AdminPanel companies={companies} inspectors={inspectors} onCompaniesChanged={loadAll} />
+        ) : tab === 'reports' && isInspector ? (
+          <Reports companies={companies} isAdmin={false} />
         ) : loading ? (
           <p className="py-12 text-center text-sm text-neutral-500">Loading…</p>
         ) : (

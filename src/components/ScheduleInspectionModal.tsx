@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import Modal from './Modal'
+import AddressAutocomplete from './AddressAutocomplete'
 import type { CompanyRow, ProfileRow } from '../types/database'
 import { createScheduledEntry } from '../lib/queries'
 import { toIsoDate } from '../lib/utils'
@@ -100,14 +101,7 @@ export default function ScheduleInspectionModal({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-neutral-700">Inspection address</label>
-          <input
-            type="text"
-            required
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="123 Main St, City"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
-          />
+          <AddressAutocomplete value={address} onChange={setAddress} placeholder="123 Main St, City" />
         </div>
 
         <div>

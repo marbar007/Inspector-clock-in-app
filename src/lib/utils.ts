@@ -49,29 +49,3 @@ export function toIsoDate(date: Date): string {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
-
-export function downloadCsv(filename: string, rows: (string | number | null)[][]) {
-  const csv = rows
-    .map((row) =>
-      row
-        .map((cell) => {
-          const value = cell === null || cell === undefined ? '' : String(cell)
-          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-            return `"${value.replace(/"/g, '""')}"`
-          }
-          return value
-        })
-        .join(',')
-    )
-    .join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}

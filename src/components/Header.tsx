@@ -1,20 +1,19 @@
 import { useAuth } from '../hooks/useAuth'
 
 interface HeaderProps {
-  tab: 'dashboard' | 'admin'
-  onTabChange: (tab: 'dashboard' | 'admin') => void
+  tab: 'dashboard' | 'admin' | 'reports'
+  onTabChange: (tab: 'dashboard' | 'admin' | 'reports') => void
 }
 
 export default function Header({ tab, onTabChange }: HeaderProps) {
   const { profile, isAdmin, signOut } = useAuth()
+  const isInspector = !isAdmin && profile?.role === 'inspector'
 
   return (
     <header className="sticky top-0 z-10 border-b border-neutral-200/70 bg-white/70 backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-400 text-sm font-bold text-neutral-900">
-            IC
-          </div>
+          <img src="/logo.png" alt="Inspector Clock" className="h-15 w-15 rounded-lg object-contain" />
           <span className="text-sm font-semibold text-neutral-900">Inspector Clock</span>
         </div>
 
@@ -35,6 +34,27 @@ export default function Header({ tab, onTabChange }: HeaderProps) {
               }`}
             >
               Admin
+            </button>
+          </div>
+        )}
+
+        {isInspector && (
+          <div className="flex rounded-lg border border-neutral-200 bg-white p-0.5 text-sm">
+            <button
+              onClick={() => onTabChange('dashboard')}
+              className={`rounded-md px-3 py-1 font-medium transition ${
+                tab === 'dashboard' ? 'bg-neutral-900 text-white' : 'text-neutral-500'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => onTabChange('reports')}
+              className={`rounded-md px-3 py-1 font-medium transition ${
+                tab === 'reports' ? 'bg-neutral-900 text-white' : 'text-neutral-500'
+              }`}
+            >
+              Reports
             </button>
           </div>
         )}

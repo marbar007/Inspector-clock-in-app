@@ -1,16 +1,23 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { fetchAllEntriesInRange } from '../../lib/queries'
 import type { TimeEntryWithRelations } from '../../types'
-import { downloadCsv, formatClock, formatDateLabel, toIsoDate } from '../../lib/utils'
+import type { CompanyRow } from '../../types/database'
+import { formatClock, formatDateLabel, toIsoDate } from '../../lib/utils'
+
+interface ReportsProps {
+  companies: CompanyRow[]
+  isAdmin: boolean
+}
 
 function startOfThisMonthIso() {
   const d = new Date()
   return toIsoDate(new Date(d.getFullYear(), d.getMonth(), 1))
 }
 
-export default function Reports() {
+export default function Reports({ companies, isAdmin }: ReportsProps) {
   const [start, setStart] = useState(startOfThisMonthIso())
   const [end, setEnd] = useState(toIsoDate(new Date()))
+  const [companyId, setCompanyId] = useState('')
   const [entries, setEntries] = useState<TimeEntryWithRelations[] | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -21,11 +28,34 @@ export default function Reports() {
     setLoading(false)
   }
 
-  function exportCsv() {
-    if (!entries) return
-    const rows: (string | number | null)[][] = [
+  const filteredEntries = useMemo(() => {
+    if (!entries) return null
+    if (!companyId) return entries
+    return entries.filter((e) => e.company_id === companyId)
+  }, [entries, companyId])
+
+  const byCompany = new Map<string, { name: string; hours: number }>()
+  const byInspector = new Map<string, { name: string; hours: number }>()
+
+  filteredEntries?.forEach((e) => {
+    const hours = e.hours ?? 0
+    const company = byCompany.get(e.company_id) ?? { name: e.company.name, hours: 0 }
+    company.hours += hours
+    byCompany.set(e.company_id, company)
+
+    const inspectorName = e.inspector.full_name || e.inspector.email || 'Unknown'
+    const inspector = byInspector.get(e.inspector_id) ?? { name: inspectorName, hours: 0 }
+    inspector.hours += hours
+    byInspector.set(e.inspector_id, inspector)
+  })
+
+  async function exportXlsx() {
+    if (!filteredEntries) return
+    const XLSX = await import('xlsx')
+
+    const dataRows: (string | number | null)[][] = [
       ['Date', 'Inspector', 'Company', 'Address', 'Clock In', 'Clock Out', 'Hours', 'Status', 'Notes'],
-      ...entries.map((e) => [
+      ...filteredEntries.map((e) => [
         e.clock_in ? formatDateLabel(e.clock_in) : e.scheduled_date,
         e.inspector.full_name || e.inspector.email,
         e.company.name,
@@ -37,23 +67,20 @@ export default function Reports() {
         e.notes,
       ]),
     ]
-    downloadCsv(`inspections_${start}_to_${end}.csv`, rows)
+
+    const companyTotals = [...byCompany.values()]
+    const overallTotal = companyTotals.reduce((sum, c) => sum + c.hours, 0)
+    const totalsRows: (string | number)[][] = [
+      ['Company', 'Total Hours'],
+      ...companyTotals.map((c) => [c.name, Number(c.hours.toFixed(2))]),
+      ['Overall total', Number(overallTotal.toFixed(2))],
+    ]
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(dataRows), 'Data')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(totalsRows), 'Totals')
+    XLSX.writeFile(workbook, `inspections_${start}_to_${end}.xlsx`)
   }
-
-  const byCompany = new Map<string, { name: string; hours: number }>()
-  const byInspector = new Map<string, { name: string; hours: number }>()
-
-  entries?.forEach((e) => {
-    const hours = e.hours ?? 0
-    const company = byCompany.get(e.company_id) ?? { name: e.company.name, hours: 0 }
-    company.hours += hours
-    byCompany.set(e.company_id, company)
-
-    const inspectorName = e.inspector.full_name || e.inspector.email || 'Unknown'
-    const inspector = byInspector.get(e.inspector_id) ?? { name: inspectorName, hours: 0 }
-    inspector.hours += hours
-    byInspector.set(e.inspector_id, inspector)
-  })
 
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white/90 p-4 shadow-sm sm:p-5">
@@ -78,6 +105,21 @@ export default function Reports() {
             className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-neutral-600">Company</label>
+          <select
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+          >
+            <option value="">All companies</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={runReport}
           disabled={loading}
@@ -85,18 +127,18 @@ export default function Reports() {
         >
           {loading ? 'Running…' : 'Run Report'}
         </button>
-        {entries && (
+        {filteredEntries && (
           <button
-            onClick={exportCsv}
+            onClick={exportXlsx}
             className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
           >
-            Export CSV
+            Export Excel
           </button>
         )}
       </div>
 
-      {entries && (
-        <div className="grid gap-4 sm:grid-cols-2">
+      {filteredEntries && (
+        <div className={`grid gap-4 ${isAdmin ? 'sm:grid-cols-2' : ''}`}>
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
               Hours by Company
@@ -111,20 +153,22 @@ export default function Reports() {
               {byCompany.size === 0 && <li className="text-neutral-400">No data</li>}
             </ul>
           </div>
-          <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-              Hours by Inspector
-            </h3>
-            <ul className="space-y-1 text-sm">
-              {[...byInspector.values()].map((i) => (
-                <li key={i.name} className="flex justify-between">
-                  <span className="text-neutral-600">{i.name}</span>
-                  <span className="font-medium text-neutral-900">{i.hours.toFixed(2)}h</span>
-                </li>
-              ))}
-              {byInspector.size === 0 && <li className="text-neutral-400">No data</li>}
-            </ul>
-          </div>
+          {isAdmin && (
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                Hours by Inspector
+              </h3>
+              <ul className="space-y-1 text-sm">
+                {[...byInspector.values()].map((i) => (
+                  <li key={i.name} className="flex justify-between">
+                    <span className="text-neutral-600">{i.name}</span>
+                    <span className="font-medium text-neutral-900">{i.hours.toFixed(2)}h</span>
+                  </li>
+                ))}
+                {byInspector.size === 0 && <li className="text-neutral-400">No data</li>}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

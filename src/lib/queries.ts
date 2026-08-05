@@ -177,3 +177,17 @@ export async function updateCompany(
   const { error } = await supabase.from('companies').update(patch).eq('id', id)
   if (error) throw error
 }
+
+export async function countCompanyEntries(companyId: string) {
+  const { count, error } = await supabase
+    .from('time_entries')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function deleteCompany(id: string) {
+  const { error } = await supabase.from('companies').delete().eq('id', id)
+  if (error) throw error
+}

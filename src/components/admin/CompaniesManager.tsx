@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { CompanyRow } from '../../types/database'
-import { createCompany, updateCompany } from '../../lib/queries'
+import { countCompanyEntries, createCompany, deleteCompany, updateCompany } from '../../lib/queries'
 
 interface CompaniesManagerProps {
   companies: CompanyRow[]
@@ -12,6 +12,7 @@ export default function CompaniesManager({ companies, onChanged }: CompaniesMana
   const [color, setColor] = useState('#2563EB')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -46,6 +47,25 @@ export default function CompaniesManager({ companies, onChanged }: CompaniesMana
     onChanged()
   }
 
+  async function handleDelete(company: CompanyRow) {
+    setError(null)
+    if (!confirm(`Delete ${company.name}? This cannot be undone.`)) return
+    setDeletingId(company.id)
+    try {
+      const entryCount = await countCompanyEntries(company.id)
+      if (entryCount > 0) {
+        setError(`${company.name} has past inspections on record. Uncheck Active instead of deleting.`)
+        return
+      }
+      await deleteCompany(company.id)
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white/90 p-4 shadow-sm sm:p-5">
       <h2 className="mb-3 text-base font-semibold text-neutral-900">Companies</h2>
@@ -69,6 +89,13 @@ export default function CompaniesManager({ companies, onChanged }: CompaniesMana
               <input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} />
               Active
             </label>
+            <button
+              onClick={() => handleDelete(c)}
+              disabled={deletingId === c.id}
+              className="shrink-0 rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              Delete
+            </button>
           </li>
         ))}
       </ul>

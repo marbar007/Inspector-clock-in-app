@@ -36,7 +36,7 @@ export default function AdminPanel({ companies, inspectors, onCompaniesChanged }
       {section === 'Entries' && <EntriesTable companies={companies} inspectors={inspectors} />}
       {section === 'Companies' && <CompaniesManager companies={companies} onChanged={onCompaniesChanged} />}
       {section === 'Invite' && <InvitePanel />}
-      {section === 'Reports' && <Reports />}
+      {section === 'Reports' && <Reports companies={companies} isAdmin />}
     </div>
   )
 }
